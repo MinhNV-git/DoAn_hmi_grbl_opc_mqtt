@@ -1,0 +1,34 @@
+import serial
+from serial import Serial
+import os
+#os.system('cls')
+# os.system('clear')
+
+s = serial.Serial('COM6',115200,timeout = 1)
+print('done')
+data = s.read_until()
+a = data.decode('ASCII')
+print(a)
+s.write('ok'.encode('ASCII'))
+
+data = s.read_until()
+a = data.decode('ASCII')
+print(a)
+
+a = input()
+s.write(a.encode('ASCII'))
+while True:   
+    x = int(input('chon: 1,?   2,gcode'))
+    if x == 1:
+        while True:
+            s.write('?'.encode('ASCII'))
+            data = s.read_until()
+            a = data.decode('ASCII')
+            print(a)  
+    else:
+        b = input("gcode1 --> ")
+        s.write(bytes(b+"\r", encoding='ascii'))
+
+        data = s.read_until()
+        a = data.decode('ASCII')
+        print(a)
