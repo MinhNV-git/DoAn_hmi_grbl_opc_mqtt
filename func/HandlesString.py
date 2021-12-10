@@ -1,8 +1,6 @@
 import customlog.cstLog as log
 import math
 # Xu ly phan hoi nhan tu GRBL, lọc lấy dữ liệu: vị trí x, y, z(tương đối và tuyệt đối), feed rate
-## <Idle|MPos:100.000,100.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>
-## <Idle|MPos:100.000,100.000,0.000|FS:0,0>
 def HandlesResponseGRBL(a):		# xử lý dữ liệu từ arduino
 		x_rt = ''
 		y_rt = ''
@@ -13,7 +11,7 @@ def HandlesResponseGRBL(a):		# xử lý dữ liệu từ arduino
 		delta_y = '-100000000'
 		delta_z = '-100000000'
 		flag = 0
-		log.LogDebug(a)
+		#log.LogInfo(a)
 		if a[0] != 'o':
 			for i in a:
 				if i =='R':
@@ -84,6 +82,52 @@ def HandlesResponseGRBL(a):		# xử lý dữ liệu từ arduino
 			log.LogDebug('THREAD 1:  du lieu loi, khong theo format')
 			return (float(-100000000),float(-100000000),float(-100000000),float(-100000000), float(-100000000),float(-100000000),float(-100000000))#, float(-100000000),float(-100000000),float(-100000000)		
 
+def HandlesResponseGRBL_new(a): ### ko the su dung ###
+	try:
+		x = 0
+		y = 0
+		z = 0
+		fr = 0
+		sp = 0
+		del_x = -100000000
+		del_y = -100000000
+		del_z = -100000000
+		a = a.strip('<>\r\n')
+		# print(a)
+		a = a.split('|')
+		n= len(a)
+		# print(n)
+		if n>2:
+			xyz_ = a[1].split(':')
+			# print(xyz_)
+			xyz = xyz_[1].split(',')
+			# print(xyz)
+			frandsp_ = a[2].split(':')
+			# print(frandsp_)
+			frandsp = frandsp_[1].split(',')
+			# print(frandsp)
+			fr = float(frandsp[0])
+			sp = float(frandsp[1])
+			x = float(xyz[0])
+			y = float(xyz[1])
+			z = float(xyz[2])
+			# print(str(x)+' '+str(y)+' '+str(z)+' '+str(fr)+' '+str(sp)+"->goc-phoi: "+str(del_x)+' '+str(del_y)+' '+str(del_z))
+	except:
+		log.LogInfo('OK')	
+
+	
+	if n == 4:
+		delta_ = a[3].split(':')
+		if delta_[0] == 'WCO':
+			delta = delta_[1].split(',')
+			del_x=delta[0]
+			del_y=delta[1]
+			del_z=delta[2]
+			#print("goc-phoi: "+str(del_x)+' '+str(del_y)+' '+str(del_z))
+
+	return (x,y,z,fr,sp,del_x,del_y,del_z)
+		
+
 # xử lý từng dòng Gcode trong file Gcode
 def HandlesGcodeLine(script_line):
 		flag = 0
@@ -131,89 +175,22 @@ def HandlesGcodeLine(script_line):
 		print(str_Z)
 		return (float(str_G), float(str_X), float(str_Y), float(str_Z))
 
-def OPCdataFromScript(x_opc,y_opc,z_opc,fr,script):
-	v=-1
-	(g_file, x_file, y_file, z_file) = HandlesGcodeLine(script)
-	if x_file != x_opc and x_file != 10071999:
-			x_old = x_opc
-			x_opc = x_file
-	if y_file != y_opc and y_file != 10071999:
-		y_old = y_opc
-		y_opc = y_file
-	if z_file != z_opc and z_file != 10071999:
-		z_old = z_opc
-		z_opc = z_file
-
-	if x_file == 10071999 and y_file ==10071999:
-		v = 1           # z
-	elif x_file ==10071999 and z_file ==10071999:
-		v = 2            # y
-	elif y_file ==10071999 and z_file ==10071999:
-		v = 3            # x
-	elif x_file == 10071999:
-		v = 4           # yz
-	elif y_file == 10071999:
-		v = 5            # xz
-	elif z_file == 10071999:
-		v = 6           # xy
-	
-	# if fr_opc != fr:
-	fr_opc = fr
-
-	if v == 1:
-		frx_opc = 0
-		fry_opc = 0
-		frz_opc = fr_opc
-	elif v ==2:
-		frx_opc = 0
-		fry_opc = fr_opc
-		frz_opc = 0
-	elif v ==3:
-		frx_opc = fr_opc
-		fry_opc = 0
-		frz_opc = 0
-	elif v == 4:
-		y_ = abs(y_old - y_opc)
-		z_ = abs(z_old - z_opc)
-		fry_opc = math.sqrt(y_*y_ + z_ * z_)/math.sqrt(1+(z_/y_)*(z_/y_))
-		frz_opc =  math.sqrt(y_*y_ + z_ * z_)/ math.sqrt(1+(y_/z_)*(y_/z_))
-		frx_opc = 0
-	elif v ==5:
-		x_ = abs(x_old - x_opc)
-		z_ = abs(z_old - z_opc)
-		frz_opc =  math.sqrt(x_*x_ + z_ * z_)/ math.sqrt(1+(x_/z_)*(x_/z_))
-		frx_opc =  math.sqrt(x_*x_ + z_ * z_)/ math.sqrt(1+(z_/x_)*(z_/x_))
-		fry_opc = 0
-	elif v ==6:
-		x_ = abs(x_old - x_opc)
-		y_ = abs(y_old - y_opc)
-		fry_opc =  math.sqrt(x_*x_ + y_ * y_)/ math.sqrt(1+(x_/y_)*(x_/y_))
-		frx_opc =  math.sqrt(x_*x_ + y_ * y_)/ math.sqrt(1+(y_/x_)*(y_/x_))
-		frz_opc = 0
-	else:
-		x_ = abs(x_old - x_opc)
-		y_ = abs(y_old - y_opc)
-		z_ = abs(z_old - z_opc)
-		tong =  math.sqrt(x_*x_ + y_*y_ + z_*z_)
-		frx_opc = tong/ math.sqrt(1 + (y_/x_)*(y_/x_) + (z_/x_)*(z_/x_))
-		fry_opc = tong/ math.sqrt(1 + (x_/y_)*(x_/y_) + (z_/y_)*(z_/y_))
-		frz_opc = tong/ math.sqrt(1 + (x_/z_)*(x_/z_) + (x_/z_)*(x_/z_))
-
-	return (float(x_opc), float(y_opc), float(z_opc), float(frx_opc), float(fry_opc), float(frz_opc))
-
-
 def CalculatorFr(x_old, y_old, z_old, x_opc, y_opc, z_opc, fr):
 	dx = x_opc - x_old
 	dy = y_opc - y_old
 	dz = z_opc - z_old
 
 	tong = math.sqrt(dx*dx + dy*dy + dz*dz)
+	if tong != 0:
+		ratio = fr/tong
 
-	ratio = fr/tong
-
-	frx = abs(dx)*ratio
-	fry = abs(dy)*ratio
-	frz = abs(dz)*ratio
+		frx = abs(dx)*ratio
+		fry = abs(dy)*ratio
+		frz = abs(dz)*ratio
+	else:
+		frx = 0
+		fry = 0 
+		frz = 0
 
 	return (frx,fry,frz)	
     	

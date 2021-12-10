@@ -12,6 +12,7 @@ from serial import Serial
 import os
 import math
 from PIL import Image, ImageTk
+from tkinter import filedialog
 #thu vien minh define
 import customlog.cstLog as log
 import func.HandlesString as Handles
@@ -22,6 +23,8 @@ import func.mqtt as mqtt
 mqttIPadd="broker.hivemq.com"
 #mqttIPadd="127.0.0.1"
 mqttPort=1883
+
+file_path = 'data.txt'
 log.SetLogMode("INFO")
 # log.SetLogMode("DEBUG")
 
@@ -122,9 +125,9 @@ class GUI_grbl(tk.Tk):
 		self.Port_entry.place(x=115,y=400)
 
 		# CHON FILE G-CODE
-		self.File = tk.Button(self,text = 'FILE',width = 10,height=1, command = lambda: self.handles.get_file_gcode(self.File_entry.get()))
+		self.File = tk.Button(self,text = 'FILE',bg='#FFFFFF',width = 10,height=1, command = lambda: self.handles.browseFiles())
 		self.File.place(x=25, y = 520)
-		self.File_entry = tk.Entry(self,font = ('calibri', 15),width = 20)
+		self.File_entry = tk.Entry(self,font = ('calibri', 15),width = 17)
 		self.File_entry.place(x=115,y=520)
 
 		# THONG TIN TOA DO, FEEDRATE, SPEED
@@ -168,21 +171,23 @@ class GUI_grbl(tk.Tk):
 		self.text_control = tk.Label(self,text='---------------------------- Control --------------------------',font = ('arial', 10), bg= '#0099FF',fg='#444444')
 		self.text_control.place(x=950,y=370)
 
-		self.start = tk.Button(self,image = self.logo_start,command = lambda: self.handles.button_start())
+		self.start = tk.Button(self,image = self.logo_start,bg='#0099FF',command = lambda: self.handles.button_start())
 		self.start.place(x=970,y=400)
 
-		self.pause = tk.Button(self,image = self.logo_pause,command = lambda: self.handles.pause_button())
+		self.pause = tk.Button(self,image = self.logo_pause,bg='#0099FF',command = lambda: self.handles.pause_button())
 		self.pause.place(x=1060,y=400)
 
-		self.stop = tk.Button(self,image = self.logo_stop,command = lambda: self.handles.stop_button())
+		self.stop = tk.Button(self,image = self.logo_stop,bg='#0099FF',command = lambda: self.handles.stop_button())
 		self.stop.place(x=1150,y=400)
 
 		self.text_line = tk.Label(self,text='-------------------------------------------------------------------',font = ('arial', 10), bg= '#0099FF',fg='#444444')
 		self.text_line.place(x=950,y=455)
 
 		#self.opcUA = tk.Button(self,text='Start OPC UA Server',font = ('arial', 15),width=28,height=1,command = lambda: self.handles.OpenOPC_UA_server())
-		self.opcUA = tk.Button(self,image = self.logo_opc,width =100,height=100,command = lambda: self.handles.OpenOPC_UA_server())
+		self.opcUA = tk.Button(self,image = self.logo_opc,bg='#EE0000',width =100,height=100,command = lambda: self.handles.OpenOPC_UA_server())
 		self.opcUA.place(x=300,y=400)
+		self.MQTT = tk.Button(self,text='MQTT',bg='#EE0000',width =14,height=2,command = lambda: self.handles.btn_MQTT())
+		self.MQTT.place(x=300,y=510)
 
 		self.X_plus = tk.Button(self,text='X+',width=6,height=2, command =lambda: self.handles.x_plus(self.unit_x.get()))
 		self.X_plus.place(x=970,y=480)
@@ -220,7 +225,7 @@ class GUI_grbl(tk.Tk):
 
 		self.command_entry = tk.Entry(self,font = ('arial', 15),width=15)
 		self.command_entry.place(x=115,y=467)
-		self.send_command = tk.Button(self,text='Send',width=10,command = lambda: self.handles.send_script2grbl_and_get_reponse(self.command_entry.get()))
+		self.send_command = tk.Button(self,text='Send',bg='#FFFFFF',width=10,command = lambda: self.handles.send_script2grbl_and_get_reponse(self.command_entry.get()))
 		self.send_command.place(x=25,y=467)
 
 		self.status = tk.Label(self,text = 'status',bg='#0099FF',font = ('arial', 11))
@@ -256,7 +261,7 @@ class handles():
 		self.y = 0
 		self.z = 0
 		self.fr = 0
-
+		self.sp = 0
 		#
 		# du lieu gui den OPC UA 
 		self.x_opc=0
@@ -277,9 +282,13 @@ class handles():
 		self.z_phoi = 0
 
 		self.gobal_pause = 0
-		self.line_gcode = ''
 
-		self.mqtt = mqtt.CreateClientMQTT(mqttIPadd, mqttPort) #mqtt
+		# file
+		self.line_n = 0
+		self.run_in_file = 0
+		# mqtt
+		self.OpenMQTT_flag = 0
+		self.MQTT_msg = ''
 
 	def OpenOPC_UA_server(self):  
 		th_opc = threading.Thread(target=self.OpenOPC_UA_server_())
@@ -336,11 +345,15 @@ class handles():
 			self.frx_send2opc.set_value(frx)
 			self.fry_send2opc.set_value(fry)
 			self.frz_send2opc.set_value(frz)
-
-			self.gui.text_command['text'] = 'OPC DATA: (x, y, z) = '+'('+str(x)+', '+str(y)+', '+str(z) +')'
-			self.gui.text_command['text'] = self.gui.text_command['text'] + '\nOPC DATA: (frx, fry, frz) = '+'('+str(frx)+', '+str(fry)+', '+str(frz)+')'
+			
+			# self.gui.text_command['text'] = 'OPC DATA: (x, y, z) = '+'('+str(x)+', '+str(y)+', '+str(z) +')'
+			# self.gui.text_command['text'] = self.gui.text_command['text'] + '\nOPC DATA: (frx, fry, frz) = '+'('+str(frx)+', '+str(fry)+', '+str(frz)+')'
 			# o
-			mqtt.SendGRBLdataMQTT_ko_file(self.mqtt, x, y, z,self.fr,frx,fry,frz)  #mqtt
+			#hFile.WriteGRBL(file_path, x, y, z,self.fr,frx,fry,frz)
+
+			#mqtt.SendGRBLdataMQTT(self.mqtt,file_path)
+
+			#mqtt.SendGRBLdataMQTT_ko_file(self.mqtt, x, y, z,self.fr,frx,fry,frz)  #mqtt
 			self.DisplayOpcData(x,y,z,frx,fry,frz)
 		else:
 			log.LogInfo('OPC  : OPC UA server is not started!!!!')
@@ -392,7 +405,8 @@ class handles():
 		try:
 			# self.com2grbl.write(bytes(script+"\r", encoding='ascii'))
 			PortGRBL.SendScriptToGRBL(self.com2grbl,script)
-			if mode ==0:
+			#print("send ok")
+			if mode ==0:	# mode 0: mode xử lý các gcode gửi bằng script entry
 				(g, x_opc, y_opc, z_opc) = Handles.HandlesGcodeLine(script)
 				if x_opc != 10071999:
 					self.x_opc = x_opc
@@ -400,10 +414,11 @@ class handles():
 					self.y_opc = y_opc
 				if z_opc != 10071999:
 					self.z_opc = z_opc
-				self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
+				#self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
+				#print("send OPC ok")
 				self.gui.command_entry.delete(0,'end')
-			elif mode ==1:
-				self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
+			# elif mode ==1:		# mode 1: mode xử lý các btn x+, x-,....
+				#self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
 			log.LogInfo('MAIN:    Send to grbl: '+script)
 		except:
 			log.LogInfo('MAIN:   FAIL to send script')
@@ -416,6 +431,7 @@ class handles():
 		y = 0
 		z = 0
 		fr = 0
+		sp = 0
 		del_x = 0
 		del_y = 0
 		del_z = 0
@@ -424,19 +440,26 @@ class handles():
 		data = self.com2grbl.read_until()			# đọc dữ liệu từ cổng COM
 		a = data.decode('ASCII')
 		(self.x, self.y, self.z, self.fr, self.delta_x, self.delta_y, self.delta_z) = Handles.HandlesResponseGRBL(a)
-		print(del_x)
+		print('ok')
 		self.x_opc = -self.delta_x
 		self.y_opc = -self.delta_y
 		self.z_opc = -self.delta_z
 		while True:
-			while self.gobal_pause ==1:
-				log.LogInfo('THREAD 1:  PAUSE read x,y,z.fr ')
 			try:
 				self.com2grbl.write('?'.encode('ASCII'))
 				data = self.com2grbl.read_until()			# đọc dữ liệu từ cổng COM
 				a = data.decode('ASCII')
+				#log.LogInfo(a)
+				#hFile.WriteFileContinue("log.txt",a)
+				(x, y, z, fr, del_x, del_y, del_z) = Handles.HandlesResponseGRBL(a)
+				# log.LogInfo(str(x)+" : "+str(y)+" : "+str(z)+"feed rate : "+str(fr)+" : "+str(del_x)+" : "+str(del_y)+" : "+str(del_z))	# xử lý dữ liệu từ arduino
 
-				(self.x, self.y, self.z, self.fr, del_x, del_y, del_z) = Handles.HandlesResponseGRBL(a)		# xử lý dữ liệu từ arduino
+				if x != -100000000 and y != -100000000 and z != -100000000:
+					self.x = x
+					self.y = y
+					self.z = z
+					self.fr=fr
+					#self.sp = sp
 				if del_x != -100000000:
 					self.delta_x = del_x
 					self.delta_y = del_y 
@@ -449,9 +472,19 @@ class handles():
 					self.z_phoi = self.z - self.delta_z
 				elif self.x == -100000000:
 					self.view_xyz(self.x, self.y, self.z,0,self.delta_x, self.delta_y, self.delta_z)
-
+				# log.LogInfo('Xu ly feedrate - 1')
 				(self.frx_opc,self.fry_opc,self.frz_opc) = Handles.CalculatorFr(self.x_phoi, self.y_phoi, self.z_phoi, self.x_opc, self.y_opc, self.z_opc, self.fr)
-				self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc) # dữ liệu gửi sang opc phải là gốc theo gốc máy, nhưng self.x_opc,.. đang theo gốc phôi nên ta cong them delta
+				# log.LogInfo('Xu ly feedrate')
+				# dữ liệu gửi sang opc phải là gốc theo gốc máy, nhưng self.x_opc,.. đang theo gốc phôi nên ta cong them delta
+				self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc) 
+
+				if self.run_in_file==1:
+					if self.x_opc + self.delta_x == self.x and self.y_opc + self.delta_y == self.y and self.z_opc + self.delta_z == self.z:
+						print('DK xu ly file dung')
+						self.line_n = self.line_n+1
+						self.control_gcode_file(self.line_n)
+					else:
+						log.LogInfo("Test chay băng file loi")
 			except:
 				log.LogDebug('THREAD 1 :Cannot get data with format, no display')
 				continue
@@ -466,133 +499,42 @@ class handles():
 		self.gui.Y_goc['text'] = str(y)
 		self.gui.Z_goc['text'] = str(z)
 		self.gui.feedrate_view['text'] = str(fr)
+		
 		# self.gui.X_goc['text'] = str(x)
 
+	def browseFiles(self):
+		filename = filedialog.askopenfilename(initialdir = "./",
+											title = "G-code file",
+											filetypes = (("Text files",
+															"*.*"),
+														("all files",
+															"*.*")))
 
-	def read_script_line(self,n,file_path): # đọc dòng gcode từ file Gcode
-		file_open = open(file_path,'r')
-		for i in range(n):
-			str_ = file_open.readline()
-		return str_
+		self.file_gcode = filename
+		if self.file_gcode =='':
+			self.gui.notification('Note!','No File')
+			self.gui.File.configure(bg='#FFFFFF')
+			self.gui.text_command.configure(text='')
+		else:
+			self.gui.notification('Note!','File: '+self.file_gcode)
+			log.LogInfo(self.file_gcode)
+			self.gui.File.configure(bg='#00FFCC')
+			self.gui.text_command.configure(text=hFile.ReadGRBL(self.file_gcode))
 
 	def button_start(self):
-		t2 = threading.Thread(target=self.control_gcode_file)
-		t2.start()
-	def control_gcode_file(self):
-		#self.gui.X_goc['text'] = 'button'
-		n = 2
-		frx_opc = 0
-		fry_opc = 0
-		frz_opc = 0
-		x_opc = -self.delta_x
-		y_opc = -self.delta_y
-		z_opc = -self.delta_z
-		flag_n = 1
-		fr_opc = 0
-		v = -1
+		# t2 = threading.Thread(target=self.control_gcode_file)
+		# t2.start()
+		self.run_in_file = 1
+		self.line_n = 1
+		self.control_gcode_file(self.line_n)
 
-		while True:
-			while self.gobal_pause ==1:
-				log.LogInfo('MAIN:    PAUSE RUN via file')
-			if flag_n == 1:
-				line_from_gcode_file = self.read_script_line(n,self.file_gcode)
-				# self.gui.X_goc['text'] = line_from_gcode_file
-				self.send_script2grbl_and_get_reponse(line_from_gcode_file)
-				flag_n = 0
-
-			if line_from_gcode_file == '':
-				break
-			self.line_gcode = line_from_gcode_file
-			(g_file, x_file, y_file, z_file) = Handles.HandlesGcodeLine(line_from_gcode_file)
-
-			if x_file != x_opc and x_file != 10071999:
-			    x_old = x_opc
-			    x_opc = x_file
-			if y_file != y_opc and y_file != 10071999:
-			    y_old = y_opc
-			    y_opc = y_file
-			if z_file != z_opc and z_file != 10071999:
-			    z_old = z_opc
-			    z_opc = z_file
-
-			# self.gui.Y_goc['text'] = 'ok'
-
-			if x_file == 10071999 and y_file ==10071999:
-			    v = 1           # z
-			elif x_file ==10071999 and z_file ==10071999:
-			    v =2            # y
-			elif y_file ==10071999 and z_file ==10071999:
-			    v =3            # x
-			elif x_file == 10071999:
-			    v = 4           # yz
-			elif y_file == 10071999:
-			    v =5            # xz
-			elif z_file == 10071999:
-			    v = 6           # xy
-
-			# self.x , self.y, self.z , self.fr
-			# fr_opc = fr_opc/60
-			# self.fr = self.fr/60
-
-			if fr_opc != self.fr:
-				fr_opc = self.fr
-
-			# self.gui.Z_goc['text'] = 'ok'
-			
-			if v == 1:
-				frz_opc = fr_opc
-				frx_opc = 0
-				fry_opc = 0
-			elif v ==2:
-				fry_opc = fr_opc
-				frx_opc = 0
-				frz_opc = 0
-			elif v ==3:
-				frx_opc = fr_opc
-				fry_opc = 0
-				frz_opc = 0
-			elif v == 4:
-				y_ = abs(y_old - y_opc)
-				z_ = abs(z_old - z_opc)
-				fry_opc = math.sqrt(y_*y_ + z_ * z_)/math.sqrt(1+(z_/y_)*(z_/y_))
-				frz_opc =  math.sqrt(y_*y_ + z_ * z_)/ math.sqrt(1+(y_/z_)*(y_/z_))
-				frx_opc = 0
-			elif v ==5:
-				x_ = abs(x_old - x_opc)
-				z_ = abs(z_old - z_opc)
-				frz_opc =  math.sqrt(x_*x_ + z_ * z_)/ math.sqrt(1+(x_/z_)*(x_/z_))
-				frx_opc =  math.sqrt(x_*x_ + z_ * z_)/ math.sqrt(1+(z_/x_)*(z_/x_))
-				fry_opc = 0
-			elif v ==6:
-				x_ = abs(x_old - x_opc)
-				y_ = abs(y_old - y_opc)
-				fry_opc =  math.sqrt(x_*x_ + y_ * y_)/ math.sqrt(1+(x_/y_)*(x_/y_))
-				frx_opc =  math.sqrt(x_*x_ + y_ * y_)/ math.sqrt(1+(y_/x_)*(y_/x_))
-				frz_opc = 0
-			else:
-				x_ = abs(x_old - x_opc)
-				y_ = abs(y_old - y_opc)
-				z_ = abs(z_old - z_opc)
-				tong =  math.sqrt(x_*x_ + y_*y_ + z_*z_)
-				frx_opc = tong/ math.sqrt(1 + (y_/x_)*(y_/x_) + (z_/x_)*(z_/x_))
-				fry_opc = tong/ math.sqrt(1 + (x_/y_)*(x_/y_) + (z_/y_)*(z_/y_))
-				frz_opc = tong/ math.sqrt(1 + (x_/z_)*(x_/z_) + (x_/z_)*(x_/z_))
-
-			# self.gui.X_goc['text'] = str(x_opc)
-			# self.gui.Y_goc['text'] = str(y_opc)
-			# self.gui.Z_goc['text'] = str(z_opc)
-			#self.send2OPC(x_opc, y_opc, z_opc, frx_opc, fry_opc, frz_opc)
-			self.send2OPC(x_opc/1000, y_opc/1000, -z_opc/1000, frx_opc/60000, fry_opc/60000, frz_opc/60000)
-			#self.send2OPC(x_opc, y_opc, z_opc, frx_opc, fry_opc, frz_opc)
-
-			if x_opc + self.delta_x == self.x and y_opc + self.delta_y == self.y and z_opc + self.delta_z == self.z:
-				n = n + 1
-				flag_n = 1
-				#self.gui.text_command['text'] = str(n) + '   chay sang dong moi'
-
-
-
-
+	def control_gcode_file(self,n):
+		gcode_line = hFile.ReadLine_n(self.file_gcode,n)
+		if gcode_line == '':
+			self.run_in_file=0
+			log.LogInfo("End File")
+		else:
+			self.send_script2grbl_and_get_reponse_(gcode_line,0)
 
 	def x_plus(self,ip):
 		thread_unit = threading.Thread(target=self.x_plus_(ip))
@@ -654,39 +596,43 @@ class handles():
 	def return_0_button_(self):
 		self.send_script2grbl_and_get_reponse_('G21G90 G0Z5 \nG90 G0 X0 Y0 \nG90 G0 Z0',1)
 
-
 	def pause_button(self):
 		t2 = threading.Thread(target=self.pause_button_())
 		t2.start()
 
 	def pause_button_(self):
-		if self.gui.pause['text'] == 'PAUSE':	
+		if self.gobal_pause == 0:	
 			self.send_script2grbl_and_get_reponse_('!',1)
 			self.gobal_pause = 1
-			self.gui.X_real['text'] = str(self.x-self.delta_x)
-			self.gui.Y_real['text'] = str(self.y-self.delta_y)
-			self.gui.Z_real['text'] = str(self.z-self.delta_z)
-			self.send_script2grbl_and_get_reponse_('!',1)
-			self.gui.pause['text'] = 'Continue'
-			self.gui.pause['bg'] = '#3399FF'
-			#self.send2OPC(float(self.gui.X_goc['text']), float(self.gui.Y_goc['text']), float(self.gui.Z_goc['text']), 0,0,0)
-			self.send2OPC(self.x,self.y,self.z,0,0,0)
-		elif self.gui.pause['text'] == 'Continue':
-			self.gobal_pause = 0
-			# print(self.x)
-			# print(self.y)
-			# print(self.z)
+		else:
 			self.send_script2grbl_and_get_reponse_('~',1)
-			self.gui.pause['text'] = 'PAUSE'
-			self.gui.pause['bg'] = '#00FFFF'
+			self.gobal_pause = 0
 
+	def stop_button(self):
+		self.send_script2grbl_and_get_reponse_('$$',1)
+    		
 	def reset2zezo(self):
 		t_zezo = threading.Thread(target=self.reset2zezo_())
 		t_zezo.start()
 	def reset2zezo_(self):
 		self.send_script2grbl_and_get_reponse_('G10 P0 L20 X0 Y0 Z0',1)
 
+	# mqtt server
+	def on_message(self,client, userdata, message):
+		data = message.payload.decode('ASCII')
+		self.MQTT_msg = data
+		#print(self.MQTT_msg)
+		self.send_script2grbl_and_get_reponse_(self.MQTT_msg,0)
+		return data
 
+	def btn_MQTT(self):
+		mqtt_th = threading.Thread(target=self.OpenMQTT())
+		mqtt_th.start()
+	def OpenMQTT(self):
+		self.mqtt = mqtt.CreateClientMQTT(mqttIPadd, mqttPort, mqtt.on_connect, self.on_message) #mqtt
+		self.OpenMQTT_flag = 1
+		self.gui.MQTT.configure(bg='#00FFFF')
+		
 	#chuyen ngon ngu
 	def VietNamLanguage(self):
 		self.gui.send_command['text'] = 'Gửi'
