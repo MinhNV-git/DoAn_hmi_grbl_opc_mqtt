@@ -14,7 +14,8 @@ def CreateClientMQTT(IP, PORT, on_connect, on_message):
     client.on_connect= on_connect                      #attach function to callback
     client.on_message= on_message                      #attach function to callback
     client.connect(broker_address,port,60) #connect
-    client.subscribe("/DoAn/CNC/data") #subscribe   
+    client.subscribe("/DoAn/CNC/data") #subscribe
+    client.subscribe("/DoAn/CNC/Gcode") #subscribe    
     client.loop_start() #then keep listening forever
     return client
 
@@ -40,3 +41,7 @@ def SendGRBLdataMQTT(client, file):
 def SendGRBLdataMQTT_ko_file(client, x,y,z,fr,frx,fry,frz):
     data = "{"+str(x)+", "+str(y)+", "+str(z)+"}"+", "+str(fr)+", "+str(frx)+", "+str(fry)+", "+str(frz)
     client.publish("/DoAn/CNC/data",data,0,False)#publish
+    
+def SendGcodeMQTT(client, Gcode):
+    data = Gcode
+    client.publish("/DoAn/CNC/Gcode",data,0)

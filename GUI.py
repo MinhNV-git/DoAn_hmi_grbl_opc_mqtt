@@ -20,8 +20,8 @@ import func.PortGRBL as PortGRBL
 import func.wrFile as hFile
 import func.mqtt as mqtt
 
-mqttIPadd="broker.hivemq.com"
-#mqttIPadd="127.0.0.1"
+# mqttIPadd="broker.hivemq.com"
+mqttIPadd="127.0.0.1"
 mqttPort=1883
 
 file_path = 'data.txt'
@@ -416,6 +416,11 @@ class handles():
 					self.z_opc = z_opc
 				#self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
 				#print("send OPC ok")
+    
+				# gửi lên MQTT
+				if self.OpenMQTT_flag == 1:
+					mqtt.SendGcodeMQTT(self.mqtt,script)
+    
 				self.gui.command_entry.delete(0,'end')
 			# elif mode ==1:		# mode 1: mode xử lý các btn x+, x-,....
 				#self.send2OPC(self.x_opc+self.delta_x , self.y_opc+self.delta_y, self.z_opc+self.delta_z, self.frx_opc, self.fry_opc, self.frz_opc)
@@ -620,9 +625,11 @@ class handles():
 	# mqtt server
 	def on_message(self,client, userdata, message):
 		data = message.payload.decode('ASCII')
-		self.MQTT_msg = data
-		#print(self.MQTT_msg)
-		self.send_script2grbl_and_get_reponse_(self.MQTT_msg,0)
+		if (self.MQTT_msg != data):
+			self.MQTT_msg = data
+			# print(self.MQTT_msg)
+			# gửi dữ liệu là lệnh Gcode nhận được qua MQTT sang grbl
+			self.send_script2grbl_and_get_reponse_(self.MQTT_msg,0)
 		return data
 
 	def btn_MQTT(self):
